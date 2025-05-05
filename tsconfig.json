@@ -11,6 +11,6 @@
     "moduleResolution": "node"
   },
   "include": [
-    "./**/*.ts"
+    "index.ts"
   ]
 }

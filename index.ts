@@ -19,7 +19,8 @@ const PERPLEXITY_ASK_TOOL: Tool = {
   name: "perplexity_ask",
   description:
     "Engages in a conversation using the Sonar API. " +
-    "Accepts an array of messages (each with a role and content) " +
+    "Accepts an array of messages (each with a role and content) . " +
+        "and the last message must have role `user`. " +
     "and returns a ask completion response from the Perplexity model.",
   inputSchema: {
     type: "object",
@@ -55,7 +56,8 @@ const PERPLEXITY_RESEARCH_TOOL: Tool = {
   name: "perplexity_research",
   description:
     "Performs deep research using the Perplexity API. " +
-    "Accepts an array of messages (each with a role and content) " +
+    "Accepts an array of messages (each with a role and content) . " +
+        "and the last message must have role `user`. " +
     "and returns a comprehensive research response with citations.",
   inputSchema: {
     type: "object",
@@ -91,7 +93,8 @@ const PERPLEXITY_REASON_TOOL: Tool = {
   name: "perplexity_reason",
   description:
     "Performs reasoning tasks using the Perplexity API. " +
-    "Accepts an array of messages (each with a role and content) " +
+    "Accepts an array of messages (each with a role and content) . " +
+        "and the last message must have role `user`. " +
     "and returns a well-reasoned response using the sonar-reasoning-pro model.",
   inputSchema: {
     type: "object",
