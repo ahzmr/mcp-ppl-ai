@@ -125,6 +125,72 @@ If you see both of these this means that the integration is active. Congratulati
 
 Currently, the search parameters used are the default ones. You can modify any search parameter in the API call directly in the `index.ts` script. For this, please refer to the official [API documentation](https://docs.perplexity.ai/api-reference/chat-completions).
 
+### Step 7: Configure Proxy Settings (Optional)
+
+If you need to access the Perplexity API through a proxy server, you can set up environment variables:
+
+1. For Docker deployment, add the proxy variables to your Docker run command:
+
+```bash
+docker run -i --rm -e PERPLEXITY_API_KEY -e HTTP_PROXY="http://proxy.example.com:8080" -e HTTPS_PROXY="http://proxy.example.com:8080" mcp/perplexity-ask
+```
+
+2. For NPX deployment, set the environment variables before running:
+
+```bash
+export HTTP_PROXY="http://proxy.example.com:8080"
+export HTTPS_PROXY="http://proxy.example.com:8080"
+npx -y server-perplexity-ask
+```
+
+3. For Claude Desktop configuration, add the proxy settings to your config:
+
+```json
+{
+  "mcpServers": {
+    "perplexity-ask": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "PERPLEXITY_API_KEY",
+        "-e",
+        "HTTPS_PROXY",
+        "mcp/perplexity-ask"
+      ],
+      "env": {
+        "PERPLEXITY_API_KEY": "YOUR_API_KEY_HERE",
+        "HTTPS_PROXY": "http://proxy.example.com:8080"
+      }
+    }
+  }
+}
+```
+
+You can also specify `NO_PROXY` environment variable to exclude certain domains from using the proxy.
+
+### Testing Proxy Configuration
+
+To test if your proxy configuration is working:
+
+1. Run the server with proxy settings:
+
+```bash
+# 使用代理设置启动服务器
+export HTTPS_PROXY="http://your_proxy_server:port"
+export PERPLEXITY_API_KEY="your_api_key_here"
+npx -y server-perplexity-ask
+```
+
+2. You should see a message in the console output indicating that the proxy is enabled:
+```
+代理配置已启用: http://your_proxy_server:port
+```
+
+3. Try using the Perplexity tools in Claude or Cursor and verify that requests are going through your proxy.
+
 ### Troubleshooting 
 
 The Claude documentation provides an excellent [troubleshooting guide](https://modelcontextprotocol.io/docs/tools/debugging) you can refer to. However, you can still reach out to us at api@perplexity.ai for any additional support or [file a bug](https://github.com/ppl-ai/api-discussion/issues). 

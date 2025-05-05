@@ -7,6 +7,8 @@ import {
   ListToolsRequestSchema,
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
+import axios from "axios";
+import { HttpsProxyAgent } from "https-proxy-agent";
 
 /**
  * Definition of the Perplexity Ask Tool.
@@ -124,9 +126,19 @@ if (!PERPLEXITY_API_KEY) {
   process.exit(1);
 }
 
+// 获取代理配置环境变量
+const HTTP_PROXY = process.env.HTTP_PROXY || process.env.http_proxy;
+const HTTPS_PROXY = process.env.HTTPS_PROXY || process.env.https_proxy;
+const NO_PROXY = process.env.NO_PROXY || process.env.no_proxy;
+
+if (HTTP_PROXY || HTTPS_PROXY) {
+  console.error(`代理配置已启用: ${HTTPS_PROXY || HTTP_PROXY}`);
+}
+
 /**
  * Performs a chat completion by sending a request to the Perplexity API.
  * Appends citations to the returned message content if they exist.
+ * Supports HTTP/HTTPS proxy through environment variables via httpsAgent.
  *
  * @param {Array<{ role: string; content: string }>} messages - An array of message objects.
  * @param {string} model - The model to use for the completion.
@@ -138,7 +150,7 @@ async function performChatCompletion(
   model: string = "sonar-pro"
 ): Promise<string> {
   // Construct the API endpoint URL and request body
-  const url = new URL("https://api.perplexity.ai/chat/completions");
+  const url = "https://api.perplexity.ai/chat/completions";
   const body = {
     model: model, // Model identifier passed as parameter
     messages: messages,
@@ -147,53 +159,73 @@ async function performChatCompletion(
     // https://docs.perplexity.ai/api-reference/chat-completions
   };
 
-  let response;
-  try {
-    response = await fetch(url.toString(), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${PERPLEXITY_API_KEY}`,
-      },
-      body: JSON.stringify(body),
-    });
-  } catch (error) {
-    throw new Error(`Network error while calling Perplexity API: ${error}`);
+  // 配置 axios 选项
+  const axiosConfig: any = {
+    method: "POST",
+    url: url,
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${PERPLEXITY_API_KEY}`,
+    },
+    data: body,
+  };
+
+  // 使用 HttpsProxyAgent 方式添加代理配置（如果存在）
+  if (HTTPS_PROXY) {
+    console.error(`使用 httpsAgent 方式配置代理: ${HTTPS_PROXY}`);
+    axiosConfig.httpsAgent = new HttpsProxyAgent(HTTPS_PROXY);
+  } else if (HTTP_PROXY) {
+    console.error(`使用 httpsAgent 方式配置代理: ${HTTP_PROXY}`);
+    axiosConfig.httpsAgent = new HttpsProxyAgent(HTTP_PROXY);
   }
 
-  // Check for non-successful HTTP status
-  if (!response.ok) {
-    let errorText;
-    try {
-      errorText = await response.text();
-    } catch (parseError) {
-      errorText = "Unable to parse error response";
+  // 检查 NO_PROXY 设置
+  if (axiosConfig.httpsAgent && NO_PROXY) {
+    const hostname = new URL(url).hostname;
+    const noProxyList = NO_PROXY.split(',').map(item => item.trim());
+    if (noProxyList.some(pattern => {
+      if (pattern.startsWith('.')) {
+        return hostname.endsWith(pattern) || hostname === pattern.substring(1);
+      } else {
+        return hostname === pattern;
+      }
+    })) {
+      console.error(`${hostname} 匹配 NO_PROXY 设置，跳过代理`);
+      delete axiosConfig.httpsAgent;
     }
-    throw new Error(
-      `Perplexity API error: ${response.status} ${response.statusText}\n${errorText}`
-    );
   }
 
-  // Attempt to parse the JSON response from the API
-  let data;
   try {
-    data = await response.json();
-  } catch (jsonError) {
-    throw new Error(`Failed to parse JSON response from Perplexity API: ${jsonError}`);
+    const response = await axios(axiosConfig);
+    
+    // 处理响应数据
+    const data = response.data;
+    
+    // Directly retrieve the main message content from the response 
+    let messageContent = data.choices[0].message.content;
+
+    // If citations are provided, append them to the message content
+    if (data.citations && Array.isArray(data.citations) && data.citations.length > 0) {
+      messageContent += "\n\nCitations:\n";
+      data.citations.forEach((citation: string, index: number) => {
+        messageContent += `[${index + 1}] ${citation}\n`;
+      });
+    }
+
+    return messageContent;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        throw new Error(`Perplexity API error: ${error.response.status} ${error.response.statusText}\n${JSON.stringify(error.response.data)}`);
+      } else if (error.request) {
+        throw new Error(`Network error while calling Perplexity API: No response received`);
+      } else {
+        throw new Error(`Error setting up Perplexity API request: ${error.message}`);
+      }
+    } else {
+      throw new Error(`Error while calling Perplexity API: ${error}`);
+    }
   }
-
-  // Directly retrieve the main message content from the response 
-  let messageContent = data.choices[0].message.content;
-
-  // If citations are provided, append them to the message content
-  if (data.citations && Array.isArray(data.citations) && data.citations.length > 0) {
-    messageContent += "\n\nCitations:\n";
-    data.citations.forEach((citation: string, index: number) => {
-      messageContent += `[${index + 1}] ${citation}\n`;
-    });
-  }
-
-  return messageContent;
 }
 
 // Initialize the server with tool metadata and capabilities
